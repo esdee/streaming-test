@@ -1,47 +1,24 @@
 // Time page
-import { component$, useSignal, useVisibleTask$ } from '@builder.io/qwik';
+import { component$ } from '@builder.io/qwik';
+
+import { useStreamingRecommendations } from './hooks';
 
 export default component$(() => {
-  const time = useSignal<string>('<NULL>');
+  const url = '/api/time';
+  const question = 'What is the best hotel for a kid friendly vacation?';
+  const [recommendations, completed] = useStreamingRecommendations(
+    url,
+    question
+  );
 
-  useVisibleTask$(async () => {
-    const response = await fetch('/api/time/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        question: 'What is the answer to life, the universe, and everything?',
-      }),
-    });
-    if (response.ok) {
-      try {
-        const responseBody = response.body;
-        if (!responseBody) {
-          return;
-        }
-        const reader = responseBody.getReader();
-        const decoder = new TextDecoder();
-        // @ts-ignore - function processTReam has return type any
-        reader.read().then(function processStream({ done, value }) {
-          if (done) {
-            console.log('DONE');
-            time.value = 'DONE';
-            return;
-          } else {
-            const chunkValue = decoder.decode(value);
-            time.value = chunkValue;
-            return reader.read().then(processStream);
-          }
-        });
-      } catch (e) {
-        console.error('Error', e);
-      }
-    }
-  });
   return (
     <>
-      <h1>{time.value}</h1>
+      {completed.value === true && <h1>DONE</h1>}
+      <h4>{recommendations[0]}</h4>
+      <h4>{recommendations[1]}</h4>
+      <h4>{recommendations[2]}</h4>
+      <h4>{recommendations[3]}</h4>
+      <h4>{recommendations[4]}</h4>
     </>
   );
 });
