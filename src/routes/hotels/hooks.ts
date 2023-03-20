@@ -1,9 +1,4 @@
-import {
-  type Signal,
-  useSignal,
-  useStore,
-  useVisibleTask$,
-} from '@builder.io/qwik';
+import { type Signal, useVisibleTask$ } from '@builder.io/qwik';
 
 type IndexedText = {
   index: number;
@@ -28,39 +23,49 @@ function parseChunk(chunkValue: string): string[] {
   );
 }
 
-async function getResponse(url: string | URL, question: string) {
+async function getResponse(
+  url: string | URL,
+  question: string,
+  hotelUUIDs: string[]
+) {
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, hotelUUIDs }),
   });
   return response;
 }
 
 export function useStreamingRecommendations(
   url: string | URL,
-  question: string
-): [string[], Signal<boolean>] {
-  const recommendations = useStore<string[]>(['', '', '', '', '']);
-  const completed = useSignal<boolean>(false);
-
+  question: string,
+  hotelUUIDs: string[],
+  recommendations: string[],
+  isCompleted: Signal<boolean>
+): void {
   useVisibleTask$(async () => {
-    const response = await getResponse(url, question);
+    if (question.trim() === '') {
+      return;
+    }
+    for (let i = 0; i < recommendations.length; i++) {
+      recommendations[i] = '';
+    }
+    const response = await getResponse(url, question, hotelUUIDs);
     if (response.ok) {
       try {
         const responseBody = response.body;
         if (!responseBody) {
-          completed.value = true;
+          isCompleted.value = true;
           return;
         }
         const reader = responseBody.getReader();
         const decoder = new TextDecoder();
-        // @ts-ignore - function processTReam has return type any
+        // @ts-ignore - function processStream has return type any
         reader.read().then(function processStream({ done, value }) {
           if (done) {
-            completed.value = false;
+            isCompleted.value = true;
             return;
           } else {
             const chunkValue = decoder.decode(value);
@@ -80,5 +85,4 @@ export function useStreamingRecommendations(
       }
     }
   });
-  return [recommendations, completed];
 }

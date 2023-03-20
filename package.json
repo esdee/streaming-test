@@ -41,6 +41,7 @@
     "wrangler": "latest"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.11.0",
     "common-tags": "^1.8.2",
     "eventsource-parser": "^0.1.0",
     "gpt-3-encoder": "^1.1.4"
