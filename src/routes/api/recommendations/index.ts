@@ -2,24 +2,30 @@
 import type { RequestHandler } from '@builder.io/qwik-city';
 import { oneLine, stripIndent } from 'common-tags';
 import { createParser } from 'eventsource-parser';
-import { getHotelsFromUUIDs, Hotel } from '~/routes/hotels/hotel-data';
+import { getHotelsFromUUIDs, type Hotel } from '~/routes/hotels/hotel-data';
 
 type RecommendationParams = {
   hotelUUIDs: string[];
   question: string;
 };
 
-function apiHeaders(): Headers {
+type OpenAIHeaders = {
+  Authorization: string;
+  'OpenAI-Organization': string;
+  'Content-Type': 'application/json';
+};
+
+function apiHeaders(): OpenAIHeaders {
   return {
     Authorization: `Bearer ${import.meta.env.VITE_OPENAI_KEY}`,
-    'OpenAI-Organization': import.meta.env.VITE_OPENAI_ORGANIZATION,
+    'OpenAI-Organization': import.meta.env.VITE_OPENAI_ORGANIZATION as string,
     'Content-Type': 'application/json',
   };
 }
 
 type Payload = {
   method: string;
-  headers: Headers;
+  headers: OpenAIHeaders;
   body: string;
 };
 

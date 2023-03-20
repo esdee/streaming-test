@@ -1,5 +1,5 @@
 import { getEmbedding } from '~/open-ai';
-import { type ErrorWithMessage, isErrorWithMessage } from '~/error';
+import { isErrorWithMessage } from '~/error';
 import { executeRPC } from '~/supabase';
 import { checkQueryResults, createSupabaseClient } from '~/supabase';
 
