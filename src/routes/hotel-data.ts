@@ -15,10 +15,15 @@ type HotelDb = {
 
 export type Hotel = Pick<HotelDb, 'id' | 'uuid' | 'name' | 'description'> & {
   city: string;
-  imageUrl: string | URL | null;
+  imageUrl: string | undefined;
 };
 
 function hotelDataToHotel(hotelData: HotelDb): Hotel {
+  const imageUrl = hotelData.local_image_url
+    ? hotelData.local_image_url
+    : hotelData.fallback_image_url
+    ? hotelData.fallback_image_url
+    : undefined;
   return {
     id: hotelData.id,
     uuid: hotelData.uuid,
@@ -26,7 +31,7 @@ function hotelDataToHotel(hotelData: HotelDb): Hotel {
     description: hotelData.description,
     city: hotelData.city_name,
     // local images are hand selected and uploaaded so are preferred
-    imageUrl: hotelData.local_image_url || hotelData.fallback_image_url || null,
+    imageUrl: imageUrl,
   };
 }
 
