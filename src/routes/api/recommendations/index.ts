@@ -2,7 +2,7 @@
 import type { RequestHandler } from '@builder.io/qwik-city';
 import { oneLine, stripIndent } from 'common-tags';
 import { createParser } from 'eventsource-parser';
-import { getHotelsFromUUIDs, type Hotel } from '~/routes/hotels/hotel-data';
+import { getHotelsFromUUIDs, type Hotel } from '~/routes/hotel-data';
 
 type RecommendationParams = {
   hotelUUIDs: string[];
