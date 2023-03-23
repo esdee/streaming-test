@@ -1,4 +1,4 @@
-/// Hotels page
+/// Application entry point
 /// Returns hotels and recommendations for a given question
 
 import {
@@ -35,15 +35,17 @@ const initialState: PageState = {
   recommendationsURL: '/api/recommendations',
 };
 
-// Return the list of 5 most related hotels for a given question
+// Return the list of 5 most relevent hotels for a given question
 export const getHotels = server$(async (question: string) => {
   const hotels = await getHotelsForQuestion(question);
   return { success: true, hotels };
 });
 
+// This is the main component that renders the page
 export default component$(() => {
   const pageState = useStore<PageState>(initialState);
 
+  // Callback when user submits a question
   const onGotQuestion = $(async (question: string) => {
     if (question.trim().length === 0) return;
     pageState.hotels = [];
@@ -52,10 +54,12 @@ export default component$(() => {
     pageState.hotels = (await getHotels(pageState.question)).hotels;
   });
 
+  // Callback when all the recommendations have been returned from OpenAI
   const onGotAllRecommendations = $(() => {
     pageState.processState = 'displaying-recommendations';
   });
 
+  // Callback when user closes the recommendations list to submit a new question
   const onCloseRecommendations = $(() => {
     pageState.hotels = initialState.hotels;
     pageState.question = initialState.question;
@@ -117,9 +121,10 @@ export const Question = component$(({ onGotQuestion }: QuestionProps) => {
         }}
       />
       <div class="example-questions">
-        {exampleQuestions.map((exampleQuestion) => {
+        {exampleQuestions.map((exampleQuestion, i) => {
           return (
             <button
+              key={i}
               onClick$={async () => {
                 question.value = exampleQuestion;
                 await onGotQuestion(exampleQuestion);
