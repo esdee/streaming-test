@@ -9,17 +9,34 @@ type HotelDb = {
   name: string;
   description: string;
   city_name: string;
+  state_province_name: string;
+  country_name: string;
   local_image_url: string | null;
   fallback_image_url: string | null;
 };
 
 export type Hotel = Pick<HotelDb, 'id' | 'uuid' | 'name' | 'description'> & {
   city: string;
-  imageUrl: string | undefined;
+  imageURL: string | undefined;
+  suitenessURL: string;
 };
 
 function hotelDataToHotel(hotelData: HotelDb): Hotel {
-  const imageUrl = hotelData.local_image_url
+  const paths = [
+    hotelData.country_name,
+    hotelData.state_province_name,
+    hotelData.city_name,
+    hotelData.name,
+  ];
+  const normalized = paths.map((path) => {
+    return path
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-zA-Z0-9-]/g, '')
+      .replace(/-+/g, '-');
+  });
+  const slug = normalized.join('/');
+  const imageURL = hotelData.local_image_url
     ? hotelData.local_image_url
     : hotelData.fallback_image_url
     ? hotelData.fallback_image_url
@@ -31,7 +48,8 @@ function hotelDataToHotel(hotelData: HotelDb): Hotel {
     description: hotelData.description,
     city: hotelData.city_name,
     // local images are hand selected and uploaaded so are preferred
-    imageUrl: imageUrl,
+    imageURL: imageURL,
+    suitenessURL: `https://www.suiteness.com/suites/${slug}`,
   };
 }
 
@@ -66,7 +84,7 @@ export async function getHotelsFromUUIDs(
   const supabaseResponse = await supabaseClient
     .from('hotels')
     .select(
-      'id, uuid, name, description, city_name, local_image_url, fallback_image_url'
+      'id, uuid, name, description, city_name, state_province_name, country_name, local_image_url, fallback_image_url'
     )
     .in('uuid', hotelUUIDs);
   const checkedResponse = checkQueryResults<HotelDb[]>(

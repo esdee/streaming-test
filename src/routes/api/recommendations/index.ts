@@ -4,11 +4,13 @@ import { oneLine, stripIndent } from 'common-tags';
 import { createParser } from 'eventsource-parser';
 import { getHotelsFromUUIDs, type Hotel } from '~/routes/hotel-data';
 
+// The client must send a list of hotel UUIDs and a question in order to get generated recommendations.
 type RecommendationParams = {
   hotelUUIDs: string[];
   question: string;
 };
 
+// Compulsory headers for OpenAI API
 type OpenAIHeaders = {
   Authorization: string;
   'OpenAI-Organization': string;
@@ -54,6 +56,9 @@ async function getResponse(payload: Payload): Promise<Response> {
   return response;
 }
 
+// A prompt consists of
+// Some direction to OpenAI's completion model, the customer's question
+// and a context, which is name + description for each hotel.
 function createPrompts(question: string, hotels: Hotel[]): string[] {
   const prompts = hotels.map((h) => {
     const p = `
@@ -98,6 +103,7 @@ export const onPost: RequestHandler = async ({ send, parseBody }) => {
             if (text !== '\n') {
               count++;
             }
+            // Now we have real text that is part of the recommendation
             if (count > 0) {
               const packet = { text, index };
               const queue = encoder.encode(JSON.stringify(packet));

@@ -2,30 +2,102 @@
 /// Returns hotels and recommendations for a given question
 
 import {
-  type Signal,
   component$,
   useSignal,
   useStore,
   $,
+  useVisibleTask$,
+  type PropFunction,
 } from '@builder.io/qwik';
 import { server$ } from '@builder.io/qwik-city';
 import { useStreamingRecommendations } from './hooks';
 import { type Hotel, getHotelsForQuestion } from './hotel-data';
 
+type ProcessState =
+  | 'awaiting-question' // this is the initial state,
+  | 'awaiting-hotels' // the question has been submitted, we are waiting for the hotels to be returned
+  | 'awaiting-recommendations' // we have hotels, we are waiting for the recommendations to be returned
+  | 'displaying-recommendations'; // all done, we are displaying the recommendations that were returned
+
+type PageState = {
+  hotels: Hotel[];
+  processState: ProcessState;
+  question: string;
+  recommendations: string[];
+  recommendationsURL: string;
+};
+
+const initialState: PageState = {
+  processState: 'awaiting-question',
+  question: '',
+  hotels: [],
+  recommendations: [],
+  recommendationsURL: '/api/recommendations',
+};
+
+// Return the list of 5 most related hotels for a given question
 export const getHotels = server$(async (question: string) => {
   const hotels = await getHotelsForQuestion(question);
   return { success: true, hotels };
 });
 
 export default component$(() => {
-  const question = useSignal<string>('');
-  const hotels = useSignal<Hotel[]>([]);
+  const pageState = useStore<PageState>(initialState);
 
-  const submitQuestion = $(async () => {
-    if (question.value.trim().length === 0) return;
-    hotels.value = [];
-    hotels.value = (await getHotels(question.value)).hotels;
+  const onGotQuestion = $(async (question: string) => {
+    if (question.trim().length === 0) return;
+    pageState.hotels = [];
+    pageState.question = question;
+    pageState.processState = 'awaiting-hotels';
+    pageState.hotels = (await getHotels(pageState.question)).hotels;
   });
+
+  const onGotAllRecommendations = $(() => {
+    pageState.processState = 'displaying-recommendations';
+  });
+
+  const onCloseRecommendations = $(() => {
+    pageState.hotels = initialState.hotels;
+    pageState.question = initialState.question;
+    pageState.processState = initialState.processState;
+    pageState.recommendations = initialState.recommendations;
+  });
+
+  return (
+    <div class="main">
+      <h1>ChatCierge</h1>
+      {pageState.processState === 'awaiting-question' && (
+        <Question onGotQuestion={onGotQuestion} />
+      )}
+      {pageState.processState === 'awaiting-hotels' && (
+        <div class="loading">
+          <h1>Getting recommendations</h1>
+        </div>
+      )}
+      {pageState.hotels.length > 0 && (
+        <Hotels
+          hotels={pageState.hotels}
+          onCloseRecommendations={onCloseRecommendations}
+          onGotAllRecommendations={onGotAllRecommendations}
+          question={pageState.question}
+          recommendationsURL={pageState.recommendationsURL}
+        />
+      )}
+    </div>
+  );
+});
+
+type QuestionProps = {
+  onGotQuestion: PropFunction<(question: string) => void>;
+};
+
+export const Question = component$(({ onGotQuestion }: QuestionProps) => {
+  const question = useSignal('');
+  const exampleQuestions = [
+    'Best hotels for bachelor parties in Las Vegas?',
+    'Best hotels for Harry Potter Fans?',
+    'Best hotels for fine dining?',
+  ];
 
   return (
     <>
@@ -33,59 +105,124 @@ export default component$(() => {
         class="question"
         value={question.value}
         autoFocus
+        placeholder="e.g. Best hotels for pet lovers?"
         onInput$={(ev) => {
-          const value = (ev.target as HTMLInputElement).value;
-          question.value = value;
+          question.value = (ev.target as HTMLInputElement).value;
         }}
-        onKeyDown$={(ev) => {
+        onKeyDown$={async (ev) => {
           if (ev.key === 'Enter') {
-            submitQuestion();
+            await onGotQuestion(question.value.trim());
           }
         }}
       />
-      {hotels.value && hotels.value.length > 0 && (
-        <Hotels hotels={hotels} question={question.value} />
-      )}
+      <div class="example-questions">
+        {exampleQuestions.map((exampleQuestion) => {
+          return (
+            <button
+              onClick$={async () => {
+                question.value = exampleQuestion;
+                await onGotQuestion(exampleQuestion);
+              }}
+            >
+              {exampleQuestion}
+            </button>
+          );
+        })}
+      </div>
     </>
   );
 });
 
-type HotelsParams = {
-  hotels: Signal<Hotel[]>;
+type HotelsProps = {
+  hotels: Hotel[];
+  onCloseRecommendations: PropFunction<() => void>;
+  onGotAllRecommendations: PropFunction<() => void>;
   question: string;
+  recommendationsURL: string;
 };
 
-export const Hotels = component$(({ question, hotels }: HotelsParams) => {
-  const recommendations = useStore<string[]>(['', '', '', '', '']);
-  const isCompleted = useSignal<boolean>(false);
-  const url = '/api/recommendations';
-  const hotelUUIDs = hotels.value.map((hotel) => hotel.uuid);
-
-  useStreamingRecommendations(
-    url,
+export const Hotels = component$(
+  ({
+    hotels,
+    onCloseRecommendations,
+    onGotAllRecommendations,
     question,
-    hotelUUIDs,
-    recommendations,
-    isCompleted
-  );
+    recommendationsURL,
+  }: HotelsProps) => {
+    const recommendations = useStore<string[]>(['', '', '', '', '']); // the maximum number of recommendations is 5
+    const hotelUUIDs = hotels.map((hotel) => hotel.uuid);
+    const isCompleted = useSignal(false);
 
-  return (
-    <div class="hotels">
-      {hotels.value.map((hotel, index) => (
-        <div class="hotel" key={hotel.uuid}>
-          <h4>{hotel.name}</h4>
-          <div>
-            <img
-              class="hotel-image"
-              alt={hotel.name}
-              src={hotel.imageUrl}
-              width="100"
-              height="100"
-            ></img>
-            <p class="recommendation">{recommendations[index]}</p>
+    // We need to signal to the parent component that all the recommendations have been returned
+    useVisibleTask$(({ track }) => {
+      track(() => isCompleted.value);
+      if (isCompleted.value === true) {
+        onGotAllRecommendations();
+      }
+    });
+
+    useStreamingRecommendations(
+      recommendationsURL,
+      question,
+      hotelUUIDs,
+      recommendations,
+      isCompleted
+    );
+
+    return (
+      <div class="hotels">
+        <h3>{question}</h3>
+        {hotels.map((hotel, index) => (
+          /* Keep the key here to prevent JSX errors :(*/
+          <div class="hotel" key={hotel.uuid}>
+            <HotelDetail
+              city={hotel.city}
+              name={hotel.name}
+              imageURL={hotel.imageURL}
+              recommendation={recommendations[index]}
+              suitenessURL={hotel.suitenessURL}
+            />
           </div>
-        </div>
-      ))}
-    </div>
+        ))}
+        <button onClick$={onCloseRecommendations}>OK</button>
+      </div>
+    );
+  }
+);
+
+type HotelDetailProps = Pick<
+  Hotel,
+  'city' | 'name' | 'imageURL' | 'suitenessURL'
+> & {
+  recommendation: string;
+};
+
+// This is a Lite component, it's purely a function that returns JSX
+// https://qwik.builder.io/docs/components/lite-components/
+export const HotelDetail = ({
+  city,
+  name,
+  imageURL,
+  recommendation,
+  suitenessURL,
+}: HotelDetailProps) => {
+  return (
+    <>
+      <h4>
+        <a href={suitenessURL} target="_blank">
+          {name},{city}
+        </a>
+      </h4>
+      <div>
+        <img
+          class="hotel-image"
+          alt={name}
+          src={imageURL}
+          width="100"
+          height="100"
+        ></img>
+      </div>
+      <p class="recommendation">{recommendation}</p>
+    </>
   );
-});
+};
