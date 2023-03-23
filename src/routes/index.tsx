@@ -97,6 +97,7 @@ export const Question = component$(({ onGotQuestion }: QuestionProps) => {
     'Best hotels for bachelor parties in Las Vegas?',
     'Best hotels for Harry Potter Fans?',
     'Best hotels for fine dining?',
+    'Best hotels for pizza lovers?',
   ];
 
   return (
